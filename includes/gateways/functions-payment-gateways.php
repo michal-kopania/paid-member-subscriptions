@@ -28,6 +28,7 @@ function pms_get_payment_gateways( $only_slugs = false ) {
             'class_name'         => 'PMS_Payment_Gateway_PayPal_Standard'
         )
 //mkopania start
+        ,
         'payu' => array(
             'display_name_user'  => __( 'PayU', 'paid-member-subscriptions' ),
             'display_name_admin' => __( 'PayU REST API', 'paid-member-subscriptions' ),

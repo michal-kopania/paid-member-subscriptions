@@ -7,7 +7,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  * Verifies whether the IPN received is coming from PayPal
  *
  */
-Class PMS_IPN_Verifier {
+Class PMS_PayU_IPN_Verifier {
 
     public $is_sandbox = false;
 

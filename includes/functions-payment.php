@@ -571,7 +571,7 @@ function pms_cron_process_pending_payments() {
 
     global $wpdb;
 
-    $gateways = array( 'paypal_standard', 'paypal_express', 'stripe_intents' /*mkopania start*/ 'payu' /*mkopania end*/);
+    $gateways = array( 'paypal_standard', 'paypal_express', 'stripe_intents'  /*mkopania start*/ , 'payu' /*mkopania end*/);
 
     $payments = $wpdb->get_results( "SELECT * FROM {$wpdb->prefix}pms_payments WHERE `status` = 'pending' AND `date` > '0000-00-00 00:00:00' AND `date` < DATE_SUB( NOW(), INTERVAL 2 DAY ) AND `payment_gateway` IN ('". implode( '\',\'', $gateways ) ."') ORDER BY id DESC", ARRAY_A );
 

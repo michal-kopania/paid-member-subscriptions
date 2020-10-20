@@ -16,7 +16,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  *  @copyright  (c) 2012 - Micah Carrick
  *  @version    2.1.0
  */
-class PMS_IpnListener {
+class PMS_PayUIpnListener {
     
     /**
      *  If true, the recommended cURL PHP library is used to send the post back 
