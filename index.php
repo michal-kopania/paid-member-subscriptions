@@ -565,6 +565,10 @@ Class Paid_Member_Subscriptions {
             include_once PMS_PLUGIN_DIR_PATH . 'includes/gateways/paypal_standard/functions-paypal-standard.php';
 
 //mkopania start payu
+//OpenPayU SDK
+        if( file_exists( PMS_PLUGIN_DIR_PATH . 'includes/payu/openpayu.php' ) )
+            include_once PMS_PLUGIN_DIR_PATH . 'includes/payu/openpayu.php';
+
         if( file_exists( PMS_PLUGIN_DIR_PATH . 'includes/gateways/payu/class-payment-gateway-payu.php' ) )
             include_once PMS_PLUGIN_DIR_PATH . 'includes/gateways/payu/class-payment-gateway-payu.php';
 
@@ -577,6 +581,7 @@ Class Paid_Member_Subscriptions {
 
         if( file_exists( PMS_PLUGIN_DIR_PATH . 'includes/gateways/payu/functions-payu.php' ) )
             include_once PMS_PLUGIN_DIR_PATH . 'includes/gateways/payu/functions-payu.php';
+
 //mkopania end
         /*
          * Content restriction

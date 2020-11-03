@@ -2,6 +2,7 @@
 
 // Exit if accessed directly
 if ( ! defined( 'ABSPATH' ) ) exit;
+require_once 'openpayu.php'; //PayU SDK
 
 /**
  * Extends the payment gateway base class for payu Standard
@@ -21,29 +22,105 @@ Class PMS_Payment_Gateway_PayU extends PMS_Payment_Gateway {
     /**
       * @info Authorization data
     */
-    $client_id;
-    $client_secret;
-    $pos_id;
-
-
+    public $client_id;
+    public $client_secret;
+    public $pos_id;
+    public $continue_url;
+    public $signature_key;
     /**
      * Fires just after constructor
      *
      */
     public function init() {
-      //TODO: Do I need $this?
-        $this->supports = apply_filters( 'pms_payment_gateway_payu_supports', array( 'gateway_scheduled_payments' ) );
+        //TODO: Do I need $this?
+        // $this->supports = apply_filters( 'pms_payment_gateway_payu_supports', array( 'gateway_scheduled_payments' ) );
         $this->pos_id = pms_get_payu_pos_id();
         $this->client_id = pms_get_payu_client_id();
         $this->client_secret = pms_get_payu_client_secret();
+        $this->continue_url = pms_get_continue_url();
+        $this->signature_key = pms_get_signature_key();
+        OpenPayU_Configuration::setOauthTokenCache(new OauthCacheMemcached());
+        $this->set_OpenPayU_Configuration();
     }
 
 
+    public function set_OpenPayU_Configuration(){
+      if( pms_is_payment_test_mode() )
+          OpenPayU_Configuration::setEnvironment('sandbox');
+      else
+          OpenPayU_Configuration::setEnvironment('secure');
+
+      OpenPayU_Configuration::setMerchantPosId($this->pos_id);
+      OpenPayU_Configuration::setSignatureKey($this->signature_key);
+
+      //set Oauth Client Id and Oauth Client Secret (from merchant admin panel)
+      OpenPayU_Configuration::setOauthClientId($this->client_id);
+      OpenPayU_Configuration::setOauthClientSecret($this->client_secret);
+    }
     /*
      * Process for all register payments that are not free
      *
      */
     public function process_sign_up() {
+      // Set the notify URL
+      $notify_url = home_url() . '/?pay_gate_listener=payu_ipn&payment_id='.$this->payment_id;
+
+      $settings = get_option( 'pms_payments_settings' );
+
+      //Update payment type
+      $payment = pms_get_payment( $this->payment_id );
+      $payment->update( array( 'type' => apply_filters( 'pms_payu_payment_type', 'web_accept_payu', $this, $settings ) ) );
+
+
+      $order['continueUrl'] = $this->continue_url; //customer will be redirected to this page after successfull payment
+      $order['notifyUrl'] = $notify_url;
+      $order['customerIp'] = $_SERVER['REMOTE_ADDR'];
+      $order['merchantPosId'] = $this->pos_id; //OpenPayU_Configuration::getMerchantPosId();
+      $order['description'] = $this->subscription_plan->name." ".$this->user_email;
+      $order['currencyCode'] = $this->currency;
+      $order['totalAmount'] = $this->amount*100;
+      $order['extOrderId'] = $this->payment_id; //must be unique!
+
+      $order['products'][0]['name'] = $this->subscription_plan->name;
+      $order['products'][0]['unitPrice'] = $this->amount*100;
+      $order['products'][0]['quantity'] = 1;
+
+      //optional section buyer
+      $order['buyer']['email'] = $this->user_email;
+      $order['buyer']['phone'] = '';
+      $order['buyer']['firstName'] = $this->user_data['first_name'];
+      $order['buyer']['lastName'] = $this->user_data['last_name'];
+
+      try {
+          $response = OpenPayU_Order::create($order);
+          $status_desc = OpenPayU_Util::statusDesc($response->getStatus());
+          if ($response->getStatus() == 'SUCCESS') {
+              // echo '<div class="alert alert-success">SUCCESS: ' . $status_desc;
+              // echo '</div>';
+              //echo '<a href="'.$array["redirectUri"].'">PayU</a>';
+              //do_action( 'pms_before_payu_redirect', $array["redirectUri"], $this, $settings );
+              $payment->log_data( 'payu_to_checkout' );
+
+              if ( $payment->status != 'completed' && $payment->amount != 0 )
+                  $payment->log_data( 'payu_ipn_waiting' );
+
+              wp_redirect( $response->getResponse()->redirectUri );
+              exit;
+          } else {
+              mail('mkopania@gmail.com', 'OpenPayU order creation failed', print_r($response, true));
+              echo '<div class="alert alert-warning">' . $response->getStatus() . ': ' . $status_desc;
+              echo '</div>';
+          }
+      } catch (OpenPayU_Exception $e) {
+          mail('mkopania@gmail.com', 'OpenPayU_Exception', print_r($e, true));
+          echo '<div class="alert alert-warning">';
+          var_dump((string)$e);
+          echo '</div>';
+      }
+    }
+
+    //Save old function without SDK
+    public function process_sign_up_old() {
 
         // Do nothing if the payment id wasn't sent
         if( ! $this->payment_id )
@@ -57,7 +134,7 @@ Class PMS_Payment_Gateway_PayU extends PMS_Payment_Gateway {
 
 
         // Set the notify URL
-        $notify_url = home_url() . '/?pay_gate_listener=payu_ipn';
+        $notify_url = home_url() . '/?pay_gate_listener=payu_ipn&payment_id='.$this->payment_id;
 
         if( pms_is_payment_test_mode() )
             $host = "https://secure.snd.payu.com";
@@ -90,30 +167,17 @@ Class PMS_Payment_Gateway_PayU extends PMS_Payment_Gateway {
         $access_token = $array["access_token"];
 
         //ORDER
-        $paypal_args = array(
-            'cmd'           => '_xclick',
-            'business'      => trim( pms_get_paypal_email() ),
-            'email'         => $this->user_email,
-            'item_name'     => $this->subscription_plan->name,
-            'item_number'   => $this->subscription_plan->id,
-            'currency_code' => $this->currency,
-            'amount'        => $this->amount,
-            'tax'           => 0,
-            'custom'        => $this->payment_id,
-            'notify_url'    => $notify_url,
-            'return'        => add_query_arg( array( 'pms_gateway_payment_id' => base64_encode($this->payment_id), 'pmsscscd' => base64_encode('subscription_plans') ), $this->redirect_url ),
-            'bn'            => 'Cozmoslabs_SP',
-            'charset'       => 'UTF-8',
-            'no_shipping'   => 1
-        );
 
         $data = array(
-            "customerIp" => /*TODO: Get IP*/,
+            "customerIp" =>  $_SERVER['REMOTE_ADDR'],
             "merchantPosId" => $this->pos_id,
-            "description" => "TOD: set description",
+            "description" => $this->subscription_plan->name." ".$this->user_email,
             "currencyCode" => $this->currency,
-            "totalAmount" => $this->amount,
+            "totalAmount" => $this->amount*100,
             "extOrderId" => $this->payment_id,
+            "notifyUrl" => $notify_url,
+            "currencyCode" => $this->currency,
+            "continueUrl" => $this->continue_url,
             "buyer" => array(
                 "email" => $this->user_email,
                 "phone" => "",
@@ -123,7 +187,7 @@ Class PMS_Payment_Gateway_PayU extends PMS_Payment_Gateway {
             "products" => array(
                 array(
                     "name" => $this->subscription_plan->name,
-                    "unitPrice" => $this->amount,
+                    "unitPrice" => $this->amount*100,
                     "quantity" => "1"
                 )
             )
@@ -147,31 +211,30 @@ Class PMS_Payment_Gateway_PayU extends PMS_Payment_Gateway {
         $result = curl_exec($ch);
         if (curl_errno($ch)) {
             echo 'Error:' . curl_error($ch);
+            exit;
         }
         curl_close($ch);
 
-        echo $result;
+        //echo $result;
 
         $array = json_decode( $result, true );
-        echo "<h1> StatusCode: ".$array["status"]["statusCode"]."</h1>";
+        //echo "<h1> StatusCode: ".$array["status"]["statusCode"]."</h1>";
         if($array["status"]["statusCode"] == "SUCCESS"){
-           echo '<a href="'.$array["redirectUri"].'">PayU</a>';
-        }
+            //echo '<a href="'.$array["redirectUri"].'">PayU</a>';
 
+            //do_action( 'pms_before_payu_redirect', $array["redirectUri"], $this, $settings );
 
-        $paypal_link .= http_build_query( apply_filters( 'pms_paypal_standard_args', $paypal_args, $this, $settings ) );
+            $payment->log_data( 'payu_to_checkout' );
 
+            if ( $payment->status != 'completed' && $payment->amount != 0 )
+                $payment->log_data( 'payu_ipn_waiting' );
 
-        do_action( 'pms_before_paypal_redirect', $paypal_link, $this, $settings );
-
-        $payment->log_data( 'paypal_to_checkout' );
-
-        if ( $payment->status != 'completed' && $payment->amount != 0 )
-            $payment->log_data( 'paypal_ipn_waiting' );
-
-        // Redirect only if tkn is set
-        if( isset( $_POST['pmstkn'] ) ) {
-            wp_redirect( $paypal_link );
+            wp_redirect( $array["redirectUri"] );
+            exit;
+        }else{
+            //Authentication failed
+            $payment->log_data( 'payu_autentication_failed '.$result );
+            print_r($array);
             exit;
         }
 
@@ -179,157 +242,132 @@ Class PMS_Payment_Gateway_PayU extends PMS_Payment_Gateway {
 
 
     /*
-     * Process IPN sent by PayPal
+     * Process IPN sent by PayU
      *
      */
     public function process_webhooks() {
-
-        if( !isset( $_GET['pay_gate_listener'] ) || $_GET['pay_gate_listener'] != 'paypal_ipn' )
+        if( !isset( $_GET['pay_gate_listener'] ) || $_GET['pay_gate_listener'] != 'payu_ipn' )
             return;
 
-        // Init IPN Verifier
-        $ipn_verifier = new PMS_IPN_Verifier();
+        mail("mkopania@gmail.com","PAU IPN process_webhooks",'GET: '.print_r($_GET, true).'POST: '.print_r($_POST,true));
 
-        if( pms_is_payment_test_mode() )
-            $ipn_verifier->is_sandbox = true;
+        //PAYU verification
+        if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+            $body = file_get_contents('php://input');
+            $data = trim($body);
 
+            // mail("mkopania@gmail.com","BODY",'body: '.print_r($body, true));
 
-        $verified = false;
+            try {
+                if (!empty($data)) {
+                    $result = OpenPayU_Order::consumeNotification($data);
+                    // mail("mkopania@gmail.com","RESULT",'res: '.print_r($result, true));
+                }
 
-        // Process the IPN
-        try {
-            if( $ipn_verifier->checkRequestPost() )
-                $verified = $ipn_verifier->validate();
-        } catch ( Exception $e ) {
+                if ($result->getResponse()->order->orderId) {
 
-        }
+                    /* Check if OrderId exists in Merchant Service, update Order data by OrderRetrieveRequest */
+                    $res_orders = OpenPayU_Order::retrieve($result->getResponse()->order->orderId);
+                    mail("mkopania@gmail.com","ORDER",'orders: '.$res_orders->getStatus().print_r($res_orders, true));
 
+                    if($res_orders->getStatus() == 'SUCCESS'){
+                        //the response should be status 200
+                        header("HTTP/1.1 200 OK");
+                    } else{
+                      mail("mkopania@gmail.com","getStatus() != 'SUCCESS'",'orders: '.$res_orders->getStatus().print_r($res_orders, true));
+                      return;
+                    }
+                    //$order = $res_orders->orders[0];
+                    $order = $response->getResponse()->order;
 
-        if( $verified ) {
-
-            $post_data = $_POST;
+                } else {
+                  //something strange
+                  mail("mkopania@gmail.com","FALSE $result->getResponse()->order->orderId",'result: '.$print_r($result, true));
+                  return;
+                }
+            } catch (OpenPayU_Exception $e) {
+                mail("mkopania@gmail.com","OpenPayU_Exception",'E: '.print_r($e, true));
+                echo $e->getMessage();
+                return;
+            }
 
             // Get payment id from custom variable sent by IPN
-            $payment_id = isset( $post_data['custom'] ) ? $post_data['custom'] : 0;
+            $payment_id = $_GET['payment_id']; //$order->extOrderId in $order
 
             // Get the payment
             $payment = pms_get_payment( $payment_id );
 
+            mail("mkopania@gmail.com","Payment",'p: '.print_r($payment, true));
+
             // Get user id from the payment
             $user_id = $payment->user_id;
 
-            $payment_data = apply_filters( 'pms_paypal_ipn_payment_data', array(
-                'payment_id'     => $payment_id,
-                'user_id'        => $user_id,
-                'type'           => $post_data['txn_type'],
-                'status'         => strtolower($post_data['payment_status']),
-                'transaction_id' => $post_data['txn_id'],
-                'amount'         => $post_data['mc_gross'],
-                'date'           => $post_data['payment_date'],
-                'subscription_id'=> $post_data['item_number']
-            ), $post_data );
+            if (strtolower($order->status) == 'completed') {
+              $payment->log_data( 'payu_ipn_received', array( 'data' => $order, 'desc' => 'payu IPN' ) );
 
+              // Complete payment
+              $payment->update( array( 'status' => strtolower($order->status), 'transaction_id' => $order->orderId ) );
 
-            // web_accept is returned for A Direct Credit Card (Pro) transaction,
-            // A Buy Now, Donation or Smart Logo for eBay auctions button
-            if( $payment_data['type'] == 'web_accept' ) {
+              // Get member subscription
+              'subscription_plan_id' => $payment->subscription_id, 'number' => 1 ) );
+              $member_subscriptions = pms_get_member_subscriptions( array( 'user_id' => $user_id,
 
-                // for web_accept we expect a `payment_id` in the `custom` parameter and the subscription plan id under `item_number`
-                // if these are empty, do nothing
-                if( empty( $payment_data['payment_id'] ) || empty( $payment_data['subscription_id'] ) )
-                    return;
+              foreach( $member_subscriptions as $member_subscription ) {
+                  $subscription_plan = pms_get_subscription_plan( $member_subscription->subscription_plan_id );
+                  // If subscription is pending it is a new one
+                  if( $member_subscription->status == 'pending' ) {
+                      $member_subscription_expiration_date = $subscription_plan->get_expiration_date();
+                      pms_add_member_subscription_log( $member_subscription->id, 'subscription_activated', array( 'until' => $member_subscription_expiration_date ) );
+                  // This is an old subscription
+                  } else {
+                      if( strtotime( $member_subscription->expiration_date ) < time() || $subscription_plan->duration === 0 )
+                          $member_subscription_expiration_date = $subscription_plan->get_expiration_date();
+                      else
+                          $member_subscription_expiration_date = date( 'Y-m-d 23:59:59', strtotime( $member_subscription->expiration_date . '+' . $subscription_plan->duration . ' ' . $subscription_plan->duration_unit ) );
 
-                // If the payment has already been completed do nothing
-                if( $payment->status == 'completed' )
-                    return;
+                      pms_add_member_subscription_log( $member_subscription->id, 'subscription_renewed_manually', array( 'until' => $member_subscription_expiration_date ) );
+                  }
 
-                // If the status is completed update the payment and also activate the member subscriptions
-                if( $payment_data['status'] == 'completed' ) {
+                  // Update subscription
+                  $member_subscription->update( array( 'expiration_date' => $member_subscription_expiration_date, 'status' => 'active' ) );
+              }
 
-                    $payment->log_data( 'paypal_ipn_received', array( 'data' => $post_data, 'desc' => 'paypal IPN' ) );
+              /*
+               * If the subscription plan id sent by the IPN is not found in the members subscriptions
+               * then it could be an update to an existing one
+               *
+               * If one of the member subscriptions is in the same group as the payment subscription id,
+               * the payment subscription id is an upgrade to the member subscription one
+               *
+               */
 
-                    // Complete payment
-                    $payment->update( array( 'status' => $payment_data['status'], 'transaction_id' => $payment_data['transaction_id'] ) );
+               $current_subscription = pms_get_current_subscription_from_tier( $user_id, $payment->subscription_id );
 
-                    // Get member subscription
-                    $member_subscriptions = pms_get_member_subscriptions( array( 'user_id' => $payment_data['user_id'], 'subscription_plan_id' => $payment_data['subscription_id'], 'number' => 1 ) );
+               if( !empty( $current_subscription ) && $current_subscription->subscription_plan_id != $payment->subscription_id ) {
+                   $old_plan_id = $current_subscription->subscription_plan_id;
+                   $new_subscription_plan = pms_get_subscription_plan( $payment->subscription_id );
+                   $subscription_data = array(
+                       'user_id'              => $user_id,
+                       'subscription_plan_id' => $new_subscription_plan->id,
+                       'start_date'           => date( 'Y-m-d H:i:s' ),
+                       'expiration_date'      => $new_subscription_plan->get_expiration_date(),
+                       'status'               => 'active'
+                   );
 
-                    foreach( $member_subscriptions as $member_subscription ) {
+                   $current_subscription->update( $subscription_data );
 
-                        $subscription_plan = pms_get_subscription_plan( $member_subscription->subscription_plan_id );
+                   pms_add_member_subscription_log( $current_subscription->id, 'subscription_upgrade_success', array( 'old_plan' => $old_plan_id, 'new_plan' => $new_subscription_plan->id ) );
 
-                        // If subscription is pending it is a new one
-                        if( $member_subscription->status == 'pending' ) {
-                            $member_subscription_expiration_date = $subscription_plan->get_expiration_date();
+               }
 
-                            pms_add_member_subscription_log( $member_subscription->id, 'subscription_activated', array( 'until' => $member_subscription_expiration_date ) );
-
-                        // This is an old subscription
-                        } else {
-
-                            if( strtotime( $member_subscription->expiration_date ) < time() || $subscription_plan->duration === 0 )
-                                $member_subscription_expiration_date = $subscription_plan->get_expiration_date();
-                            else
-                                $member_subscription_expiration_date = date( 'Y-m-d 23:59:59', strtotime( $member_subscription->expiration_date . '+' . $subscription_plan->duration . ' ' . $subscription_plan->duration_unit ) );
-
-                            pms_add_member_subscription_log( $member_subscription->id, 'subscription_renewed_manually', array( 'until' => $member_subscription_expiration_date ) );
-
-                        }
-
-                        // Update subscription
-                        $member_subscription->update( array( 'expiration_date' => $member_subscription_expiration_date, 'status' => 'active' ) );
-
-                        //Can be a renewal payment or a new payment
-                        do_action( 'pms_paypal_web_accept_after_subscription_activation', $member_subscription, $payment_data, $post_data );
-                    }
-
-                    /*
-                     * If the subscription plan id sent by the IPN is not found in the members subscriptions
-                     * then it could be an update to an existing one
-                     *
-                     * If one of the member subscriptions is in the same group as the payment subscription id,
-                     * the payment subscription id is an upgrade to the member subscription one
-                     *
-                     */
-
-                     $current_subscription = pms_get_current_subscription_from_tier( $payment_data['user_id'], $payment_data['subscription_id'] );
-
-                     if( !empty( $current_subscription ) && $current_subscription->subscription_plan_id != $payment_data['subscription_id'] ) {
-
-                         $old_plan_id = $current_subscription->subscription_plan_id;
-
-                         $new_subscription_plan = pms_get_subscription_plan( $payment_data['subscription_id'] );
-
-                         $subscription_data = array(
-                             'user_id'              => $payment_data['user_id'],
-                             'subscription_plan_id' => $new_subscription_plan->id,
-                             'start_date'           => date( 'Y-m-d H:i:s' ),
-                             'expiration_date'      => $new_subscription_plan->get_expiration_date(),
-                             'status'               => 'active'
-                         );
-
-                         $current_subscription->update( $subscription_data );
-
-                         pms_add_member_subscription_log( $current_subscription->id, 'subscription_upgrade_success', array( 'old_plan' => $old_plan_id, 'new_plan' => $new_subscription_plan->id ) );
-
-                         do_action( 'pms_paypal_web_accept_after_upgrade_subscription', $member_subscription_plan->id, $payment_data, $post_data );
-
-                     }
-
-                // If payment status is not complete, something happened, so log it in the payment
-                } else {
-
-                    $payment->log_data( 'payment_failed', array( 'data' => $post_data, 'desc' => 'ipn response') );
-
-                    // Add the transaction ID
-                    $payment->update( array( 'transaction_id' => $payment_data['transaction_id'], 'status' => 'failed' ) );
-
-                }
-
+              // If payment status is not complete, something happened, so log it in the payment
+              } else {
+                  $payment->log_data( 'payment_failed', array( 'data' => $order, 'desc' => 'ipn response') );
+                  // Add the transaction ID
+                  $payment->update( array( 'transaction_id' => $payment_data['transaction_id'], 'status' => 'failed' ) );
+              }
             }
-
-            do_action( 'pms_paypal_ipn_listener_verified', $payment_data, $post_data );
-
+          }
         }
 
     }
@@ -347,6 +385,9 @@ Class PMS_Payment_Gateway_PayU extends PMS_Payment_Gateway {
             pms_errors()->add( 'form_general', __( 'The selected gateway is not configured correctly: <strong>PayU client_id is missing</strong>. Contact the system administrator.', 'paid-member-subscriptions' ) );
         if ( pms_get_payu_client_secret() === false )
             pms_errors()->add( 'form_general', __( 'The selected gateway is not configured correctly: <strong>PayU client_secret is missing</strong>. Contact the system administrator.', 'paid-member-subscriptions' ) );
+//            $this->continue_url = pms_get_continue_url();
+        if ( pms_get_signature_key() === false)
+            pms_errors()->add( 'form_general', __( 'The selected signature_key is not configured correctly: <strong>PayU signature_key is missing</strong>. Contact the system administrator.', 'paid-member-subscriptions' ) );
 
     }
 

@@ -18,33 +18,36 @@ function pms_add_settings_content_payu( $options ) {
         <div class="pms-form-field-wrapper">
             <label class="pms-form-field-label" for="payu-client_id"><?php _e( 'PayU client_id', 'paid-member-subscriptions' ); ?></label>
             <input id="payu-client_id" type="text" name="pms_payments_settings[gateways][payu][client_id]" value="<?php echo isset( $options['gateways']['payu']['client_id' ]) ? $options['gateways']['payu']['client_id'] : ''; ?>" class="widefat" />
-
             <input type="hidden" name="pms_payments_settings[gateways][payu][name]" value="PayU" />
-
             <p class="description"><?php _e( 'Enter your PayU client_id', 'paid-member-subscriptions' ); ?></p>
         </div>
 
         <div class="pms-form-field-wrapper">
             <label class="pms-form-field-label" for="payu-client_secret"><?php _e( 'PayU client_secret', 'paid-member-subscriptions' ); ?></label>
             <input id="payu-client_secret" type="text" name="pms_payments_settings[gateways][payu][client_secret]" value="<?php echo isset( $options['gateways']['payu']['client_secret' ]) ? $options['gateways']['payu']['client_secret'] : ''; ?>" class="widefat" />
-
             <p class="description"><?php _e( 'Enter your PayU client_secret', 'paid-member-subscriptions' ); ?></p>
         </div>
 
         <div class="pms-form-field-wrapper">
             <label class="pms-form-field-label" for="payu-pos_id"><?php _e( 'PayU pos_id', 'paid-member-subscriptions' ); ?></label>
             <input id="payu-pos_id" type="text" name="pms_payments_settings[gateways][payu][pos_id]" value="<?php echo isset( $options['gateways']['payu']['pos_id' ]) ? $options['gateways']['payu']['pos_id'] : ''; ?>" class="widefat" />
-
             <p class="description"><?php _e( 'Enter your PayU pos_id', 'paid-member-subscriptions' ); ?></p>
         </div>
 
+        <div class="pms-form-field-wrapper">
+            <label class="pms-form-field-label" for="payu-signature_key"><?php _e( 'PayU signature key - Second key (MD5)', 'paid-member-subscriptions' ); ?></label>
+            <input id="payu-pos_id" type="text" name="pms_payments_settings[gateways][payu][signature_key]" value="<?php echo isset( $options['gateways']['payu']['signature_key' ]) ? $options['gateways']['payu']['signature_key'] : ''; ?>" class="widefat" />
+            <p class="description"><?php _e( 'Enter your PayU signature key - Second key (MD5)', 'paid-member-subscriptions' ); ?></p>
+        </div>
+
+        <div class="pms-form-field-wrapper">
+            <label class="pms-form-field-label" for="payu-continue_url"><?php _e( 'PayU "Thank you" page URL address', 'paid-member-subscriptions' ); ?></label>
+            <input id="payu-continue_url" type="text" name="pms_payments_settings[gateways][payu][continue_url]" value="<?php echo isset( $options['gateways']['payu']['continue_url' ]) ? $options['gateways']['payu']['continue_url'] : ''; ?>" class="widefat" />
+            <p class="description"><?php _e( 'Enter URL for "Thank you page" where client is redirecte after PayU payment', 'paid-member-subscriptions' ); ?></p>
+        </div>
 
         <?php do_action( 'pms_settings_page_payment_gateway_payu_extra_fields', $options ); ?>
 
-        <!-- IPN Message -->
-        <p class="pms-ipn-notice">
-            <?php printf( __( 'TODO: REMOVE THIS In order for <strong>PayPal payments to work correctly</strong>, you need to setup the IPN Url in your PayPal account. %sMore info%s', 'paid-member-subscriptions' ), '<a href="https://www.cozmoslabs.com/docs/paid-member-subscriptions/member-payments/#IPN_for_PayPal_gateways">', '</a>' ); ?>
-        </p>
 
     </div>
 
@@ -88,6 +91,21 @@ function pms_get_payu_client_secret() {
  */
 function pms_get_payu_pos_id() {
     return pms_get_payu_setting('pos_id');
+}
+
+/**
+ * Returns the PayU pos_id
+ *
+ */
+function pms_get_signature_key() {
+    return pms_get_payu_setting('signature_key');
+}
+
+/**
+* Returns URL where client should be redirected from PAYU after payment. - Thank you page
+**/
+function pms_get_continue_url() {
+    return pms_get_payu_setting('continue_url');
 }
 
 /**
