@@ -32,8 +32,8 @@ Class PMS_Payment_Gateway_PayU extends PMS_Payment_Gateway {
      *
      */
     public function init() {
-        //TODO: Do I need $this?
-        // $this->supports = apply_filters( 'pms_payment_gateway_payu_supports', array( 'gateway_scheduled_payments' ) );
+        //Do I need $this? Yes I do
+        $this->supports = apply_filters( 'pms_payment_gateway_payu_supports', array( 'gateway_scheduled_payments' ) );
         $this->pos_id = pms_get_payu_pos_id();
         $this->client_id = pms_get_payu_client_id();
         $this->client_secret = pms_get_payu_client_secret();
@@ -268,108 +268,118 @@ Class PMS_Payment_Gateway_PayU extends PMS_Payment_Gateway {
 
                     /* Check if OrderId exists in Merchant Service, update Order data by OrderRetrieveRequest */
                     $res_orders = OpenPayU_Order::retrieve($result->getResponse()->order->orderId);
-                    mail("mkopania@gmail.com","ORDER",'orders: '.$res_orders->getStatus().print_r($res_orders, true));
+                    mail("mkopania@gmail.com","ORDER!",'orders: '.$res_orders->getStatus().print_r($res_orders, true));
+                    $order = $result->getResponse()->order;
+                    // mail("mkopania@gmail.com","ORDER2",is_null($order) ? "NULL" : (is_null(print_r($order,true)) ? "null2":print_r($order,true) ));
 
                     if($res_orders->getStatus() == 'SUCCESS'){
                         //the response should be status 200
-                        header("HTTP/1.1 200 OK");
+                        //header("HTTP/1.1 200 OK");
                     } else{
                       mail("mkopania@gmail.com","getStatus() != 'SUCCESS'",'orders: '.$res_orders->getStatus().print_r($res_orders, true));
-                      return;
+                      // return;
                     }
-                    //$order = $res_orders->orders[0];
-                    $order = $response->getResponse()->order;
 
                 } else {
                   //something strange
                   mail("mkopania@gmail.com","FALSE $result->getResponse()->order->orderId",'result: '.$print_r($result, true));
-                  return;
+                  // return;
                 }
             } catch (OpenPayU_Exception $e) {
-                mail("mkopania@gmail.com","OpenPayU_Exception",'E: '.print_r($e, true));
-                echo $e->getMessage();
-                return;
+              mail("mkopania@gmail.com","OpenPayU_Exception",'E: '.print_r($e, true));
+              //echo $e->getMessage();
+              // return;
+            } catch (Exception $e) {
+              mail("mkopania@gmail.com","Exception",'E: '.print_r($e, true));
+              //echo $e->getMessage();
+              // return;
             }
+            finally {
 
-            // Get payment id from custom variable sent by IPN
-            $payment_id = $_GET['payment_id']; //$order->extOrderId in $order
+              // Get payment id from custom variable sent by IPN
+              $payment_id = $_GET['payment_id']; //$order->extOrderId in $order
 
-            // Get the payment
-            $payment = pms_get_payment( $payment_id );
+              // Get the payment
+              $payment = pms_get_payment( $payment_id );
 
-            mail("mkopania@gmail.com","Payment",'p: '.print_r($payment, true));
+              mail("mkopania@gmail.com","Payment",'p: '.print_r($payment, true).print_r($order,true));
 
-            // Get user id from the payment
-            $user_id = $payment->user_id;
+              // Get user id from the payment
+              $user_id = $payment->user_id;
 
-            if (strtolower($order->status) == 'completed') {
-              $payment->log_data( 'payu_ipn_received', array( 'data' => $order, 'desc' => 'payu IPN' ) );
+              if (strtolower($order->status) == 'completed') {
+                $payment->log_data( 'payu_ipn_received', array( 'data' => $order, 'desc' => 'completed' ) );
 
-              // Complete payment
-              $payment->update( array( 'status' => strtolower($order->status), 'transaction_id' => $order->orderId ) );
+                // Complete payment
+                $payment->update( array( 'status' => strtolower($order->status), 'transaction_id' => $order->orderId ) );
 
-              // Get member subscription
-              'subscription_plan_id' => $payment->subscription_id, 'number' => 1 ) );
-              $member_subscriptions = pms_get_member_subscriptions( array( 'user_id' => $user_id,
+                // Get member subscription
+                $member_subscriptions = pms_get_member_subscriptions( array( 'user_id' => $user_id, 'subscription_plan_id' => $payment->subscription_id, 'number' => 1 ) );
 
-              foreach( $member_subscriptions as $member_subscription ) {
-                  $subscription_plan = pms_get_subscription_plan( $member_subscription->subscription_plan_id );
-                  // If subscription is pending it is a new one
-                  if( $member_subscription->status == 'pending' ) {
-                      $member_subscription_expiration_date = $subscription_plan->get_expiration_date();
-                      pms_add_member_subscription_log( $member_subscription->id, 'subscription_activated', array( 'until' => $member_subscription_expiration_date ) );
-                  // This is an old subscription
-                  } else {
-                      if( strtotime( $member_subscription->expiration_date ) < time() || $subscription_plan->duration === 0 )
-                          $member_subscription_expiration_date = $subscription_plan->get_expiration_date();
-                      else
-                          $member_subscription_expiration_date = date( 'Y-m-d 23:59:59', strtotime( $member_subscription->expiration_date . '+' . $subscription_plan->duration . ' ' . $subscription_plan->duration_unit ) );
+                foreach( $member_subscriptions as $member_subscription ) {
+                    $subscription_plan = pms_get_subscription_plan( $member_subscription->subscription_plan_id );
+                    // If subscription is pending it is a new one
+                    if( $member_subscription->status == 'pending' ) {
+                        $member_subscription_expiration_date = $subscription_plan->get_expiration_date();
+                        pms_add_member_subscription_log( $member_subscription->id, 'subscription_activated', array( 'until' => $member_subscription_expiration_date ) );
+                    // This is an old subscription
+                    } else {
+                        if( strtotime( $member_subscription->expiration_date ) < time() || $subscription_plan->duration === 0 )
+                            $member_subscription_expiration_date = $subscription_plan->get_expiration_date();
+                        else
+                            $member_subscription_expiration_date = date( 'Y-m-d 23:59:59', strtotime( $member_subscription->expiration_date . '+' . $subscription_plan->duration . ' ' . $subscription_plan->duration_unit ) );
 
-                      pms_add_member_subscription_log( $member_subscription->id, 'subscription_renewed_manually', array( 'until' => $member_subscription_expiration_date ) );
-                  }
+                        pms_add_member_subscription_log( $member_subscription->id, 'subscription_renewed_manually', array( 'until' => $member_subscription_expiration_date ) );
+                    }
 
-                  // Update subscription
-                  $member_subscription->update( array( 'expiration_date' => $member_subscription_expiration_date, 'status' => 'active' ) );
-              }
+                    // Update subscription
+                    $member_subscription->update( array( 'expiration_date' => $member_subscription_expiration_date, 'status' => 'active' ) );
+                }
 
-              /*
-               * If the subscription plan id sent by the IPN is not found in the members subscriptions
-               * then it could be an update to an existing one
-               *
-               * If one of the member subscriptions is in the same group as the payment subscription id,
-               * the payment subscription id is an upgrade to the member subscription one
-               *
-               */
+                /*
+                 * If the subscription plan id sent by the IPN is not found in the members subscriptions
+                 * then it could be an update to an existing one
+                 *
+                 * If one of the member subscriptions is in the same group as the payment subscription id,
+                 * the payment subscription id is an upgrade to the member subscription one
+                 *
+                 */
 
-               $current_subscription = pms_get_current_subscription_from_tier( $user_id, $payment->subscription_id );
+                 $current_subscription = pms_get_current_subscription_from_tier( $user_id, $payment->subscription_id );
 
-               if( !empty( $current_subscription ) && $current_subscription->subscription_plan_id != $payment->subscription_id ) {
-                   $old_plan_id = $current_subscription->subscription_plan_id;
-                   $new_subscription_plan = pms_get_subscription_plan( $payment->subscription_id );
-                   $subscription_data = array(
-                       'user_id'              => $user_id,
-                       'subscription_plan_id' => $new_subscription_plan->id,
-                       'start_date'           => date( 'Y-m-d H:i:s' ),
-                       'expiration_date'      => $new_subscription_plan->get_expiration_date(),
-                       'status'               => 'active'
-                   );
+                 if( !empty( $current_subscription ) && $current_subscription->subscription_plan_id != $payment->subscription_id ) {
+                     $old_plan_id = $current_subscription->subscription_plan_id;
+                     $new_subscription_plan = pms_get_subscription_plan( $payment->subscription_id );
+                     $subscription_data = array(
+                         'user_id'              => $user_id,
+                         'subscription_plan_id' => $new_subscription_plan->id,
+                         'start_date'           => date( 'Y-m-d H:i:s' ),
+                         'expiration_date'      => $new_subscription_plan->get_expiration_date(),
+                         'status'               => 'active'
+                     );
 
-                   $current_subscription->update( $subscription_data );
+                     $current_subscription->update( $subscription_data );
 
-                   pms_add_member_subscription_log( $current_subscription->id, 'subscription_upgrade_success', array( 'old_plan' => $old_plan_id, 'new_plan' => $new_subscription_plan->id ) );
+                     pms_add_member_subscription_log( $current_subscription->id, 'subscription_upgrade_success', array( 'old_plan' => $old_plan_id, 'new_plan' => $new_subscription_plan->id ) );
 
-               }
+                 }
 
-              // If payment status is not complete, something happened, so log it in the payment
-              } else {
-                  $payment->log_data( 'payment_failed', array( 'data' => $order, 'desc' => 'ipn response') );
+                // If payment status is not complete, something happened, so log it in the payment
+              } elseif(strtolower($order->status) == 'pending') {
+                    $payment->log_data( 'payment_pending', array( 'data' => $order, 'desc' => $order->status) );
+                    // Add the transaction ID
+                    $payment->update( array( 'transaction_id' => $order->orderId, 'status' => 'pending' ) );
+                }else{
+                  $payment->log_data( 'payment_failed', array( 'data' => $order, 'desc' => $order->status) );
                   // Add the transaction ID
-                  $payment->update( array( 'transaction_id' => $payment_data['transaction_id'], 'status' => 'failed' ) );
+                  $payment->update( array( 'transaction_id' => $order->orderId, 'status' => 'failed' ) );
+                }
+                //the response should be status 200
+                header("HTTP/1.1 200 OK");
               }
-            }
-          }
-        }
+              mail("mkopania@gmail.com","po try catch",'ffff: ');
 
+        }
     }
 
 
