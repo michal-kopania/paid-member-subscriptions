@@ -572,6 +572,9 @@ Class Paid_Member_Subscriptions {
         if( file_exists( PMS_PLUGIN_DIR_PATH . 'includes/gateways/payu/class-payment-gateway-payu.php' ) )
             include_once PMS_PLUGIN_DIR_PATH . 'includes/gateways/payu/class-payment-gateway-payu.php';
 
+        if( file_exists( PMS_PLUGIN_DIR_PATH . 'includes/gateways/payu/class-payment-gateway-payu-standard.php' ) )
+                include_once PMS_PLUGIN_DIR_PATH . 'includes/gateways/payu/class-payment-gateway-payu-standard.php';
+
         // PayU listener
         if( file_exists( PMS_PLUGIN_DIR_PATH . 'includes/gateways/payu/ipnlistener.php' ) )
             include_once PMS_PLUGIN_DIR_PATH . 'includes/gateways/payu/ipnlistener.php';
@@ -970,6 +973,10 @@ Class Paid_Member_Subscriptions {
                 ) ) );
             }
         }
+
+        /*mkopania*/
+        wp_register_script( 'payu-front-end', PMS_PLUGIN_DIR_URL . 'assets/js/payu-front-end.js', array( 'jquery' ), PMS_VERSION );
+        wp_enqueue_script( 'payu-front-end' );
 
     }
 

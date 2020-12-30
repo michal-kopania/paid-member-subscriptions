@@ -265,6 +265,15 @@ class PMS_Plugin_Usage_Tracker {
 				else
 					return false;
 
+				case 'payu_standard':
+
+						$active_gateways = pms_get_active_payment_gateways();
+
+						if( in_array( 'payu_standard', $active_gateways ) )
+							return true;
+						else
+							return false;
+
 //mkopania end
 			case 'stripe':
 

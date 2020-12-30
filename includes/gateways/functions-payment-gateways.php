@@ -30,12 +30,18 @@ function pms_get_payment_gateways( $only_slugs = false ) {
 //mkopania start
         ,
         'payu' => array(
-            'display_name_user'  => __( 'PayU', 'paid-member-subscriptions' ),
-            'display_name_admin' => __( 'PayU REST API', 'paid-member-subscriptions' ),
+            'display_name_user'  => __( 'PayU recurring', 'paid-member-subscriptions' ),
+            'display_name_admin' => __( 'PayU REST API (recurring)', 'paid-member-subscriptions' ),
             'class_name'         => 'PMS_Payment_Gateway_PayU'
         )
+        ,
+        'payu_standard' => array(
+            'display_name_user'  => __( 'PayU standard', 'paid-member-subscriptions' ),
+            'display_name_admin' => __( 'PayU REST API (standard)', 'paid-member-subscriptions' ),
+            'class_name'         => 'PMS_Payment_Gateway_PayU_Standard'
+        )
 //mkopania end
-        
+
     ));
 
 
@@ -310,7 +316,20 @@ function pms_get_output_payment_gateways( $pms_settings = array() ) {
 
             if( $gateway_obj->supports( 'recurring_payments' ) )
                 $gateway_supports_arr[$gateway_slug]['recurring'] = 1;
-
+            //mkopania for test
+            if( $gateway_obj->supports( 'credit_card' ) )
+                $gateway_supports_arr[$gateway_slug]['type'] = 'credit_card';
+            //For frond-end mkopania
+            $gateway_supports_arr[$gateway_slug]['test_mode'] = $gateway_obj->test_mode ;
+            if($gateway_obj->pos_id)
+              $gateway_supports_arr[$gateway_slug]['pos_id'] = $gateway_obj->pos_id;
+            /*if( $gateway_obj->client_id)
+              $gateway_supports_arr[$gateway_slug]['client_id'] = $gateway_obj->client_id;
+            if($gateway_obj->client_secret)
+              $gateway_supports_arr[$gateway_slug]['client_secret'] = $gateway_obj->client_secret;
+            if($gateway_obj->signature_key)
+              $gateway_supports_arr[$gateway_slug]['signature_key'] = $gateway_obj->signature_key;
+              */
         }
     }
 
@@ -370,7 +389,7 @@ function pms_get_output_payment_gateways( $pms_settings = array() ) {
                         // Check to see if the gateway exists
                         if( empty( $payment_gateways[$paygate_key] ) )
                             continue;
-
+//Check $gateway_supports_arr[$paygate_key]
                         $output .= '<label>';
                             $output .= apply_filters( 'pms_output_payment_gateway_input_radio', '<input type="radio" class="pms_pay_gate" name="pay_gate" value="' . esc_attr( $paygate_key ) . '" ' . checked( $default_gateway, $paygate_key, false ) . $gateway_supports_arr[$paygate_key] . ' />', $paygate_key );
                             $output .= '<span class="pms-paygate-name">' . $payment_gateways[$paygate_key]['display_name_user'] . '</span>';

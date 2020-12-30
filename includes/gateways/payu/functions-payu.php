@@ -13,7 +13,7 @@ function pms_add_settings_content_payu( $options ) {
     ?>
 
     <div class="pms-payment-gateway-wrapper">
-        <h4 class="pms-payment-gateway-title"><?php echo apply_filters( 'pms_settings_page_payment_gateway_payu_title', __( 'payu Standard', 'paid-member-subscriptions' ) ); ?></h4>
+        <h4 class="pms-payment-gateway-title"><?php echo apply_filters( 'pms_settings_page_payment_gateway_payu_title', __( 'PayU', 'paid-member-subscriptions' ) ); ?></h4>
 
         <div class="pms-form-field-wrapper">
             <label class="pms-form-field-label" for="payu-client_id"><?php _e( 'PayU client_id', 'paid-member-subscriptions' ); ?></label>

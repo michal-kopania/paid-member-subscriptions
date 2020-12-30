@@ -592,7 +592,7 @@ function pms_cron_process_pending_payments() {
             if( $payment_obj->payment_gateway == 'stripe_intents' )
                 $payment_obj->log_data( 'stripe_authentication_link_not_clicked' );
             //mkopania start
-            elseif( $payment_obj->payment_gateway == 'payu' )
+            elseif( $payment_obj->payment_gateway == 'payu' or $payment_obj->payment_gateway == 'payu_standard' )
                 $payment_obj->log_data( 'payu_ipn_not_received' );
             //mkopania end
             else
