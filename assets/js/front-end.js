@@ -194,7 +194,8 @@ jQuery( function($) {
                 }
 
             }
-
+            // mkopania Handling payu display
+            handle_payu_recurring_display();
 
             // Select the first first available payment gateway by default after hiding the gateways
             if( $( paygate_selector + ':not([disabled]):checked' ).length == 0 )

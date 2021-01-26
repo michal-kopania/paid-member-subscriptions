@@ -97,7 +97,7 @@ Class PMS_Payment_Gateway_PayU extends PMS_Payment_Gateway {
       $order['buyer']['phone'] = '';
       $order['buyer']['firstName'] = $this->user_data['first_name'];
       $order['buyer']['lastName'] = $this->user_data['last_name'];
-
+      // mail('mkopania@gmail.com', 'OpenPayU order', print_r($order, true));
       try {
           $response = OpenPayU_Order::create($order);
           $status_desc = OpenPayU_Util::statusDesc($response->getStatus());
@@ -122,6 +122,12 @@ Class PMS_Payment_Gateway_PayU extends PMS_Payment_Gateway {
           mail('mkopania@gmail.com', 'OpenPayU_Exception', print_r($e, true));
           echo '<div class="alert alert-warning">';
           var_dump((string)$e);
+          echo '</div>';
+      } catch (Exception $e) {
+          mail('mkopania@gmail.com', 'OpenPayU_Exception', print_r($e, true));
+          echo '<div class="alert alert-warning">';
+          var_dump((string)$e);
+          var_dump($order);
           echo '</div>';
       }
     }
