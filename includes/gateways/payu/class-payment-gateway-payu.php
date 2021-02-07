@@ -97,7 +97,12 @@ Class PMS_Payment_Gateway_PayU extends PMS_Payment_Gateway {
       $order['buyer']['phone'] = '';
       $order['buyer']['firstName'] = $this->user_data['first_name'];
       $order['buyer']['lastName'] = $this->user_data['last_name'];
-      // mail('mkopania@gmail.com', 'OpenPayU order', print_r($order, true));
+      if($_POST["responseTokenize"]){
+        $order['recurring'] = 'FIRST';
+        $order['payMethods']['payMethod']['value'] = $_POST["responseTokenize"];
+        $order['payMethods']['payMethod']['type'] = 'CARD_TOKEN';
+      }
+      mail('mkopania@gmail.com', 'OpenPayU order', print_r($order, true).print_r($_POST, true));
       try {
           $response = OpenPayU_Order::create($order);
           $status_desc = OpenPayU_Util::statusDesc($response->getStatus());

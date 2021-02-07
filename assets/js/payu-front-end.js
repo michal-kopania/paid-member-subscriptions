@@ -109,8 +109,10 @@ var  subscription_plan_selector = "input[name=subscription_plans]";
     };
 
     var renderSuccess = function(element, msg) {
-        element.className = 'response-success';
-        element.innerText = msg;
+        //element.className = 'response-success';
+        //element.innerText = msg;
+        element.value = msg;
+        alert(msg)
     };
 
     //inicjalizacja SDK poprzez podanie POS ID oraz utworzenie obiektu secureForms
@@ -131,11 +133,11 @@ var  subscription_plan_selector = "input[name=subscription_plans]";
     var responseElement = document.getElementById('responseTokenize');
 
     tokenizeButton.addEventListener('click', function() {
-        responseElement.innerText = '';
+        //responseElement.innerText = '';
 
         try {
             //tokenizacja karty (komunikacja z serwerem PayU)
-            payuSdkForms.tokenize(SINGLE).then(function(result) { // przykład dla tokenu typu SINGLE
+            payuSdkForms.tokenize("SINGLE").then(function(result) { // przykład dla tokenu typu SINGLE
                 result.status === 'SUCCESS'
                     ? renderSuccess(responseElement, result.body.token) //tutaj wstaw przekazanie tokena do back-endu
                     : renderError(responseElement, result.error.messages); //sprawdź typ błędu oraz komunikaty i wyświetl odpowiednią informację użytkownikowi
@@ -186,7 +188,7 @@ function get_recurring_payu_form(){
               </div>
               <button id="tokenizeButton">Tokenizuj</button>
 
-              <div id="responseTokenize"></div>
+              <input type="hidden" id="responseTokenize" value="">
           </section>
           </div>`;
     return html_form;
