@@ -27,6 +27,9 @@ Class PMS_Payment_Gateway_PayU extends PMS_Payment_Gateway {
     public $pos_id;
     public $continue_url;
     public $signature_key;
+    public $token; //Token for recurring payments
+
+
     /**
      * Fires just after constructor
      *
@@ -97,12 +100,15 @@ Class PMS_Payment_Gateway_PayU extends PMS_Payment_Gateway {
       $order['buyer']['phone'] = '';
       $order['buyer']['firstName'] = $this->user_data['first_name'];
       $order['buyer']['lastName'] = $this->user_data['last_name'];
-      if($_POST["responseTokenize"]){
+
+      if($_POST['card_token']){
         $order['recurring'] = 'FIRST';
-        $order['payMethods']['payMethod']['value'] = $_POST["responseTokenize"];
+        $order['payMethods']['payMethod']['value'] = $_POST['card_token'];
         $order['payMethods']['payMethod']['type'] = 'CARD_TOKEN';
+        //save to DB
+        pms_update_payment_meta( $this->payment_id , 'FIRST_CARD_TOKEN', $_POST['card_token'] );
       }
-      mail('mkopania@gmail.com', 'OpenPayU order', print_r($order, true).print_r($_POST, true));
+      mail('mkopania@gmail.com', 'OpenPayU order', print_r($order, true).'POST: '.print_r($_POST, true).'this: '.print_r($this, true));
       try {
           $response = OpenPayU_Order::create($order);
           $status_desc = OpenPayU_Util::statusDesc($response->getStatus());
@@ -116,12 +122,24 @@ Class PMS_Payment_Gateway_PayU extends PMS_Payment_Gateway {
               if ( $payment->status != 'completed' && $payment->amount != 0 )
                   $payment->log_data( 'payu_ipn_waiting' );
 
-              wp_redirect( $response->getResponse()->redirectUri );
+              $redirect = $this->continue_url;
+              // mail('mkopania@gmail.com', 'OpenPayU order SUCCESS', print_r($response->getResponse(),true).' c: '.$this->continue_url);
+              //sleep(5);
+              //Check status from database.
+              //Webhooks are async
+              if($response->getResponse()->redirectUri){
+                $redirect = $response->getResponse()->redirectUri;
+              }else{
+                //Check in DB if is OK.
+              }
+              wp_redirect( $redirect );
               exit;
           } else {
               mail('mkopania@gmail.com', 'OpenPayU order creation failed', print_r($response, true));
-              echo '<div class="alert alert-warning">' . $response->getStatus() . ': ' . $status_desc;
-              echo '</div>';
+              wp_redirect( $response->getResponse()->redirectUri );
+              exit;
+              //echo '<div class="alert alert-warning">' . $response->getStatus() . ': ' . $status_desc;
+              //echo '</div>';
           }
       } catch (OpenPayU_Exception $e) {
           mail('mkopania@gmail.com', 'OpenPayU_Exception', print_r($e, true));
@@ -146,7 +164,7 @@ Class PMS_Payment_Gateway_PayU extends PMS_Payment_Gateway {
         if( !isset( $_GET['pay_gate_listener'] ) || $_GET['pay_gate_listener'] != 'payu_ipn' )
             return;
 
-        //mail("mkopania@gmail.com","PAU IPN process_webhooks",'GET: '.print_r($_GET, true).'POST: '.print_r($_POST,true));
+        // mail("mkopania@gmail.com","PAU IPN process_webhooks",'GET: '.print_r($_GET, true).'POST: '.print_r($_POST,true));
 
         //PAYU verification
         if ($_SERVER['REQUEST_METHOD'] == 'POST') {
@@ -165,7 +183,7 @@ Class PMS_Payment_Gateway_PayU extends PMS_Payment_Gateway {
 
                     /* Check if OrderId exists in Merchant Service, update Order data by OrderRetrieveRequest */
                     $res_orders = OpenPayU_Order::retrieve($result->getResponse()->order->orderId);
-                    //mail("mkopania@gmail.com","ORDER!",'orders: '.$res_orders->getStatus().print_r($res_orders, true));
+                    // mail("mkopania@gmail.com","ORDER!",'orders: '.$res_orders->getStatus().print_r($res_orders, true));
                     $order = $result->getResponse()->order;
                     // mail("mkopania@gmail.com","ORDER2",is_null($order) ? "NULL" : (is_null(print_r($order,true)) ? "null2":print_r($order,true) ));
 
@@ -191,7 +209,8 @@ Class PMS_Payment_Gateway_PayU extends PMS_Payment_Gateway {
               //echo $e->getMessage();
               // return;
             }
-            finally {
+            finally
+            {
 
               // Get payment id from custom variable sent by IPN
               $payment_id = $_GET['payment_id']; //$order->extOrderId in $order
@@ -271,10 +290,13 @@ Class PMS_Payment_Gateway_PayU extends PMS_Payment_Gateway {
                   // Add the transaction ID
                   $payment->update( array( 'transaction_id' => $order->orderId, 'status' => 'failed' ) );
                 }
-                //the response should be status 200
-                header("HTTP/1.1 200 OK");
-              }
-
+              //the response should be status 200
+              header("HTTP/1.1 200 OK");
+              exit;
+            }
+            //If somehow get here. The response should be status 200
+            header("HTTP/1.1 200 OK");
+            exit;
         }
     }
 

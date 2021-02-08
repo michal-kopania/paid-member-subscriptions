@@ -616,9 +616,11 @@ if( ! function_exists( 'pms_renewal_option_field' ) ) {
 
         }
 
-        if( ! empty( $pms_settings['recurring'] ) )
+        if( ! empty( $pms_settings['recurring'] ) ){
             $output .= '<input type="hidden" name="pms_default_recurring" value="' . esc_attr( $pms_settings['recurring'] ) . '" />';
-
+            //mkopania token
+            $output .= '<input type="hidden" name="card_token" value="' . esc_attr( $pms_settings['token'] ) . '" />';
+        }
         return $output;
 
     }

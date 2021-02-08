@@ -94,6 +94,15 @@ function pms_get_payu_pos_id() {
 }
 
 /**
+ * Returns the PayU token
+ *
+ */
+function pms_get_payu_token() {
+    return pms_get_payu_setting('token');
+}
+
+
+/**
  * Returns the PayU pos_id
  *
  */

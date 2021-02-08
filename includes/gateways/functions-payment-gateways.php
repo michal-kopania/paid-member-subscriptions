@@ -321,8 +321,10 @@ function pms_get_output_payment_gateways( $pms_settings = array() ) {
                 $gateway_supports_arr[$gateway_slug]['type'] = 'credit_card';
             //For frond-end mkopania
             $gateway_supports_arr[$gateway_slug]['test_mode'] = $gateway_obj->test_mode ;
-            if($gateway_obj->pos_id)
+            if($gateway_obj->pos_id){
               $gateway_supports_arr[$gateway_slug]['pos_id'] = $gateway_obj->pos_id;
+              $gateway_supports_arr[$gateway_slug]['token'] = $gateway_obj->token;
+            }
             /*if( $gateway_obj->client_id)
               $gateway_supports_arr[$gateway_slug]['client_id'] = $gateway_obj->client_id;
             if($gateway_obj->client_secret)

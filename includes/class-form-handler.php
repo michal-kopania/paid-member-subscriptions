@@ -1792,7 +1792,7 @@ Class PMS_Form_Handler {
 
             }
 
-            $payment_gateway_data = array_merge( $payment_gateway_data, $payment_data );
+            $payment_gateway_data = array_merge( $payment_gateway_data, $payment_data);
 
 
             /**

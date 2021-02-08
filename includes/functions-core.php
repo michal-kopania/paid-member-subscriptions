@@ -212,7 +212,6 @@ if ( ! defined( 'ABSPATH' ) ) exit;
      *
      */
     function pms_add_hidden_submit_button_loading_placeholder_text() {
-
         echo '<span id="pms-submit-button-loading-placeholder-text" style="display: none;">' . apply_filters( 'pms_submit_button_loading_placeholder_text', __( 'Processing. Please wait...', 'paid-member-subscriptions' ) ) . '</span>';
 
     }

@@ -64,7 +64,7 @@ var  subscription_plan_selector = "input[name=subscription_plans]";
     	float: left;
     }
 
-    #payu-card-containter button {
+    #payu-card-containter button, #tokenizeButton {
     	border: none;
     	background: #438F29;
     	padding: 8px 15px;
@@ -106,13 +106,22 @@ var  subscription_plan_selector = "input[name=subscription_plans]";
             messages.push(error.message);
         });
         element.innerText = messages.join(', ');
+        jQuery('input[name ="pms_new_subscription"]').hide();
+        jQuery('input[name ="pms_confirm_retry_payment_subscription"]').hide();
+        jQuery('input[name="pms_upgrade_subscription"]').hide();
+        jQuery('input[name="pms_renew_subscription"]').hide();
     };
 
     var renderSuccess = function(element, msg) {
-        //element.className = 'response-success';
-        //element.innerText = msg;
-        element.value = msg;
-        alert(msg)
+        element.className = 'response-success';
+        element.innerText = 'Karta OK. Wciśnij [Subskrybuj], aby kontynuować'; //msg;
+        jQuery('input[name ="pms_new_subscription"]').show();
+        jQuery('input[name ="pms_confirm_retry_payment_subscription"]').show();
+        jQuery('input[name="pms_upgrade_subscription"]').show();
+        jQuery('input[name="pms_renew_subscription"]').show();
+        let elements = document.getElementsByName('card_token');
+        elements[0].value = msg;
+        //alert(msg)
     };
 
     //inicjalizacja SDK poprzez podanie POS ID oraz utworzenie obiektu secureForms
@@ -133,7 +142,7 @@ var  subscription_plan_selector = "input[name=subscription_plans]";
     var responseElement = document.getElementById('responseTokenize');
 
     tokenizeButton.addEventListener('click', function() {
-        //responseElement.innerText = '';
+        responseElement.innerText = '';
 
         try {
             //tokenizacja karty (komunikacja z serwerem PayU)
@@ -186,9 +195,8 @@ function get_recurring_payu_form(){
                       </div>
                   </div>
               </div>
-              <button id="tokenizeButton">Tokenizuj</button>
-
-              <input type="hidden" id="responseTokenize" value="">
+              <div id="tokenizeButton">Sprawdź kartę</div>
+              <div id="responseTokenize"></div>
           </section>
           </div>`;
     return html_form;
@@ -283,6 +291,20 @@ jQuery( function($) {
       //Should not happen
     }
     return pos_id;
+  }
+
+  function get_payu_token(){
+    let payu_input = $('input[value="payu"]');
+
+    if(payu_input.length == 0 ){
+      payu_input = $('input[value="payu_standard"]');
+    }
+    if(payu_input.length > 0 ){
+      token = payu_input.first().data('token');
+    }else{
+      //Should not happen
+    }
+    return token;
   }
 
   jQuery( document ).on( 'click', subscription_plan_selector + '[type=radio]', function() {
